@@ -1,9 +1,9 @@
 <?php
-
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure conn.php uses mysqli now
 
+// Get JSON input
 $data = json_decode(file_get_contents("php://input"), true);
 
 $title = trim($data['title'] ?? '');
@@ -19,35 +19,43 @@ if (!$title || !$durationDays) {
     exit();
 }
 
-$id = uniqid();
+$id = uniqid(); // unique ID for challenge
 
-$query = "INSERT INTO CommunityChallenges 
-(id, title, description, category, level, duration_days)
-VALUES (?, ?, ?, ?, ?, ?)";
+// Prepare SQL statement for MySQL
+$stmt = $conn->prepare("INSERT INTO CommunityChallenges 
+    (id, title, description, category, level, duration_days)
+    VALUES (?, ?, ?, ?, ?, ?)");
 
-$params = [
-    $id,
-    $title,
-    $description,
-    $category,
-    $level,
-    $durationDays
-];
-
-$stmt = sqlsrv_query($conn, $query, $params);
-
-if ($stmt === false) {
+if (!$stmt) {
     echo json_encode([
-        "error" => "Failed to add community challenge"
+        "error" => "Failed to prepare statement: " . $conn->error
     ]);
     exit();
 }
 
-echo json_encode([
-    "message" => "Community challenge added successfully",
-    "challenge_id" => $id
-]);
+// Bind parameters
+$stmt->bind_param(
+    "sssssi", 
+    $id, 
+    $title, 
+    $description, 
+    $category, 
+    $level, 
+    $durationDays
+);
 
-sqlsrv_close($conn);
+// Execute statement
+if ($stmt->execute()) {
+    echo json_encode([
+        "message" => "Community challenge added successfully",
+        "challenge_id" => $id
+    ]);
+} else {
+    echo json_encode([
+        "error" => "Failed to add community challenge: " . $stmt->error
+    ]);
+}
 
+$stmt->close();
+$conn->close();
 ?>

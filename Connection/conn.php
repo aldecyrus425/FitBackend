@@ -1,17 +1,19 @@
 <?php
+header("Content-Type: application/json");
 
-$serverName = "ANONYMOUS\\SQLEXPRESS";
+// MySQL connection settings for XAMPP
+$host = "localhost";      // XAMPP default
+$user = "root";           // XAMPP default
+$password = "";           // XAMPP default
+$dbname = "fitclub";      // Your database name
 
-$connectionOptions = [
-    "Database" => "fitclub",
-    "Encrypt" => false,
-    "TrustServerCertificate" => true
-];
+$conn = new mysqli($host, $user, $password, $dbname);
 
-$conn = sqlsrv_connect($serverName, $connectionOptions);
-
-if ($conn === false) {
-    die(json_encode(sqlsrv_errors()));
+// Check connection
+if ($conn->connect_error) {
+    die(json_encode(["error" => "Connection failed: " . $conn->connect_error]));
 }
 
+// Connection is successful
+// You can now use $conn for queries
 ?>

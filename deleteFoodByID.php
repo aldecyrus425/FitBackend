@@ -1,6 +1,6 @@
 <?php
 header("Content-Type: application/json");
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure conn.php uses mysqli
 
 $raw = file_get_contents("php://input");
 $data = json_decode($raw, true);
@@ -13,18 +13,20 @@ if (!$data || !isset($data['foodID'])) {
 
 $foodId = $data['foodID'];
 
-// Delete from database
-$deleteQuery = "DELETE FROM Food WHERE id = ?";
-$deleteStmt = sqlsrv_query($conn, $deleteQuery, [$foodId]);
+// Delete from database using prepared statement
+$deleteStmt = $conn->prepare("DELETE FROM Food WHERE id = ?");
+$deleteStmt->bind_param("s", $foodId);
 
-if ($deleteStmt === false) {
+if ($deleteStmt->execute()) {
+    echo json_encode(["message" => "Food deleted successfully"]);
+} else {
     http_response_code(500);
-    echo json_encode(["error" => "Failed to delete food"]);
-    exit();
+    echo json_encode([
+        "error" => "Failed to delete food",
+        "details" => $deleteStmt->error
+    ]);
 }
 
-
-echo json_encode(["message" => "Food deleted successfully"]);
-
-sqlsrv_close($conn);
+$deleteStmt->close();
+$conn->close();
 ?>

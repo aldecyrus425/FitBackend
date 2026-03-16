@@ -1,7 +1,7 @@
 <?php
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // should use mysqli_connect
 
 $data = json_decode(file_get_contents("php://input"), true);
 
@@ -17,33 +17,39 @@ if (!$userId) {
 
 // Query to get all challenges for this user
 $query = "
-    SELECT uc.challenge_id, uc.status, uc.progress, uc.started_at, uc.completed_at
-    FROM UserCommunityChallenge uc
-    WHERE uc.user_id = ?
+    SELECT challenge_id, status, progress, started_at, completed_at
+    FROM UserCommunityChallenge
+    WHERE user_id = ?
 ";
 
-$params = [$userId];
-$stmt = sqlsrv_query($conn, $query, $params);
+$stmt = $conn->prepare($query);
+$stmt->bind_param("s", $userId);
 
-if ($stmt === false) {
+if (!$stmt->execute()) {
     echo json_encode([
-        "error" => "Failed to fetch user challenges"
+        "error" => "Failed to fetch user challenges",
+        "details" => $stmt->error
     ]);
+    $stmt->close();
+    $conn->close();
     exit();
 }
 
+$result = $stmt->get_result();
+
 $userChallenges = [];
-while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+while ($row = $result->fetch_assoc()) {
     $userChallenges[] = [
         "challenge_id" => $row['challenge_id'],
         "status" => $row['status'],
         "progress" => floatval($row['progress']),
-        "started_at" => $row['started_at'] ? $row['started_at']->format('Y-m-d H:i:s') : null,
-        "completed_at" => $row['completed_at'] ? $row['completed_at']->format('Y-m-d H:i:s') : null,
+        "started_at" => $row['started_at'] ? date('Y-m-d H:i:s', strtotime($row['started_at'])) : null,
+        "completed_at" => $row['completed_at'] ? date('Y-m-d H:i:s', strtotime($row['completed_at'])) : null,
     ];
 }
 
 echo json_encode($userChallenges);
 
-sqlsrv_close($conn);
+$stmt->close();
+$conn->close();
 ?>

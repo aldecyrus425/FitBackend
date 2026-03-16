@@ -1,6 +1,6 @@
 <?php
 header("Content-Type: application/json");
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure conn.php uses mysqli
 
 $data = json_decode(file_get_contents("php://input"), true);
 $exerciseId = $data['id'] ?? '';
@@ -11,16 +11,20 @@ if (!$exerciseId) {
     exit();
 }
 
-$deleteQuery = "DELETE FROM Exercises WHERE id = ?";
-$deleteStmt = sqlsrv_query($conn, $deleteQuery, [$exerciseId]);
+// Delete the exercise using mysqli prepared statement
+$deleteStmt = $conn->prepare("DELETE FROM Exercises WHERE id = ?");
+$deleteStmt->bind_param("s", $exerciseId);
 
-if ($deleteStmt === false) {
+if ($deleteStmt->execute()) {
+    echo json_encode(["message" => "Exercise deleted successfully"]);
+} else {
     http_response_code(500);
-    echo json_encode(["error" => "Failed to delete exercise"]);
-    exit();
+    echo json_encode([
+        "error" => "Failed to delete exercise",
+        "details" => $deleteStmt->error
+    ]);
 }
 
-echo json_encode(["message" => "Exercise deleted successfully"]);
-
-sqlsrv_close($conn);
+$deleteStmt->close();
+$conn->close();
 ?>

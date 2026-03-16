@@ -1,7 +1,7 @@
 <?php
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure conn.php uses mysqli
 
 // Read JSON payload
 $data = json_decode(file_get_contents("php://input"), true);
@@ -13,18 +13,20 @@ if (!$challengeId) {
     exit();
 }
 
-// Delete the challenge
-$deleteQuery = "DELETE FROM CommunityChallenges WHERE id = ?";
-$deleteStmt = sqlsrv_query($conn, $deleteQuery, [$challengeId]);
+// Delete the challenge using mysqli prepared statement
+$deleteStmt = $conn->prepare("DELETE FROM CommunityChallenges WHERE id = ?");
+$deleteStmt->bind_param("s", $challengeId);
 
-if ($deleteStmt === false) {
+if ($deleteStmt->execute()) {
+    echo json_encode(["message" => "Challenge deleted successfully"]);
+} else {
     http_response_code(500);
-    echo json_encode(["error" => "Failed to delete challenge"]);
-    exit();
+    echo json_encode([
+        "error" => "Failed to delete challenge",
+        "details" => $deleteStmt->error
+    ]);
 }
 
-// Success response
-echo json_encode(["message" => "Challenge deleted successfully"]);
-
-sqlsrv_close($conn);
+$deleteStmt->close();
+$conn->close();
 ?>

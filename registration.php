@@ -1,7 +1,7 @@
 <?php
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // mysqli connection
 
 $data = json_decode(file_get_contents("php://input"), true);
 
@@ -17,35 +17,38 @@ if (!$name || !$email || !$password) {
     exit();
 }
 
-$checkQuery = "SELECT id FROM Users WHERE email = ?";
-$params = [$email];
+// Check if email already exists
+$checkQuery = "SELECT id FROM Users WHERE email = ? LIMIT 1";
+$stmt = $conn->prepare($checkQuery);
+$stmt->bind_param("s", $email);
+$stmt->execute();
+$result = $stmt->get_result();
 
-$stmt = sqlsrv_query($conn, $checkQuery, $params);
-
-if ($stmt === false) {
-    echo json_encode(["error" => "Database query failed"]);
-    exit();
-}
-
-if (sqlsrv_has_rows($stmt)) {
+if ($result->num_rows > 0) {
     http_response_code(409);
     echo json_encode(["error" => "Email already registered"]);
+    $stmt->close();
+    $conn->close();
     exit();
 }
 
+$stmt->close();
+
+// Insert new user
 $userId = uniqid();
 $passwordHash = password_hash($password, PASSWORD_BCRYPT);
 
 $insertQuery = "INSERT INTO Users (id, name, email, password_hash, fitness_service, level, is_admin)
                 VALUES (?, ?, ?, ?, ?, ?, 0)";
 
-$params = [$userId, $name, $email, $passwordHash, $fitnessService, $level];
+$insertStmt = $conn->prepare($insertQuery);
+$insertStmt->bind_param("ssssss", $userId, $name, $email, $passwordHash, $fitnessService, $level);
 
-$insertStmt = sqlsrv_query($conn, $insertQuery, $params);
-
-if ($insertStmt === false) {
+if (!$insertStmt->execute()) {
     http_response_code(500);
-    echo json_encode(["error" => "Failed to register user"]);
+    echo json_encode(["error" => "Failed to register user", "details" => $insertStmt->error]);
+    $insertStmt->close();
+    $conn->close();
     exit();
 }
 
@@ -62,5 +65,6 @@ echo json_encode([
     ]
 ]);
 
-sqlsrv_close($conn);
+$insertStmt->close();
+$conn->close();
 ?>

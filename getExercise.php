@@ -1,18 +1,21 @@
 <?php
 header("Content-Type: application/json");
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // conn.php should use mysqli_connect
 
 $query = "SELECT * FROM Exercises";
-$stmt = sqlsrv_query($conn, $query);
+$stmt = $conn->prepare($query);
 
-if ($stmt === false) {
+if (!$stmt) {
     http_response_code(500);
-    echo json_encode(["error" => "Database query failed"]);
+    echo json_encode(["error" => "Failed to prepare query", "details" => $conn->error]);
     exit();
 }
 
+$stmt->execute();
+$result = $stmt->get_result();
+
 $exercises = [];
-while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+while ($row = $result->fetch_assoc()) {
     $exercises[] = [
         "id" => $row["id"],
         "name" => $row["name"],
@@ -27,5 +30,7 @@ while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
 }
 
 echo json_encode($exercises);
-sqlsrv_close($conn);
+
+$stmt->close();
+$conn->close();
 ?>

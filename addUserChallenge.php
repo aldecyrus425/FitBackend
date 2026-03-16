@@ -1,7 +1,6 @@
 <?php
-
 header("Content-Type: application/json");
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure conn.php uses mysqli for XAMPP
 
 $data = json_decode(file_get_contents("php://input"), true);
 
@@ -24,59 +23,64 @@ if ($progress >= 1.0 || strtolower($status) === 'completed') {
 $startedAt = date('Y-m-d H:i:s');
 
 // Check if user already has this challenge
-$checkQuery = "SELECT * FROM UserCommunityChallenge WHERE user_id = ? AND challenge_id = ?";
-$checkStmt = sqlsrv_query($conn, $checkQuery, [$userId, $challengeId]);
+$checkStmt = $conn->prepare("SELECT * FROM UserCommunityChallenge WHERE user_id = ? AND challenge_id = ?");
+$checkStmt->bind_param("ss", $userId, $challengeId);
 
-if ($checkStmt === false) {
-    echo json_encode(["error" => "Database error checking existing challenge"]);
+if (!$checkStmt->execute()) {
+    echo json_encode(["error" => "Database error checking existing challenge", "details" => $checkStmt->error]);
     exit();
 }
 
-if (sqlsrv_has_rows($checkStmt)) {
+$result = $checkStmt->get_result();
+
+if ($result->num_rows > 0) {
     // Update existing record
-    $updateQuery = "UPDATE UserCommunityChallenge
+    $updateStmt = $conn->prepare("
+        UPDATE UserCommunityChallenge
         SET status = ?, progress = ?, started_at = ?, completed_at = ?
-        WHERE user_id = ? AND challenge_id = ?";
+        WHERE user_id = ? AND challenge_id = ?
+    ");
+    $updateStmt->bind_param("sdssss", $status, $progress, $startedAt, $completedAt, $userId, $challengeId);
 
-    $params = [$status, $progress, $startedAt, $completedAt, $userId, $challengeId];
-    $stmt = sqlsrv_query($conn, $updateQuery, $params);
-
-    if ($stmt === false) {
-        echo json_encode(["error" => "Failed to update user challenge"]);
-        exit();
+    if ($updateStmt->execute()) {
+        echo json_encode([
+            "message" => "User challenge updated successfully",
+            "user_id" => $userId,
+            "challenge_id" => $challengeId,
+            "status" => $status,
+            "progress" => $progress,
+            "completed_at" => $completedAt
+        ]);
+    } else {
+        echo json_encode(["error" => "Failed to update user challenge", "details" => $updateStmt->error]);
     }
 
-    echo json_encode([
-        "message" => "User challenge updated successfully",
-        "user_id" => $userId,
-        "challenge_id" => $challengeId,
-        "status" => $status,
-        "progress" => $progress,
-        "completed_at" => $completedAt
-    ]);
+    $updateStmt->close();
 } else {
     // Insert new record
-    $insertQuery = "INSERT INTO UserCommunityChallenge
+    $insertStmt = $conn->prepare("
+        INSERT INTO UserCommunityChallenge
         (user_id, challenge_id, status, progress, started_at, completed_at)
-        VALUES (?, ?, ?, ?, ?, ?)";
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
+    $insertStmt->bind_param("sssdss", $userId, $challengeId, $status, $progress, $startedAt, $completedAt);
 
-    $params = [$userId, $challengeId, $status, $progress, $startedAt, $completedAt];
-    $stmt = sqlsrv_query($conn, $insertQuery, $params);
-
-    if ($stmt === false) {
-        echo json_encode(["error" => "Failed to add user challenge"]);
-        exit();
+    if ($insertStmt->execute()) {
+        echo json_encode([
+            "message" => "User challenge added successfully",
+            "user_id" => $userId,
+            "challenge_id" => $challengeId,
+            "status" => $status,
+            "progress" => $progress,
+            "completed_at" => $completedAt
+        ]);
+    } else {
+        echo json_encode(["error" => "Failed to add user challenge", "details" => $insertStmt->error]);
     }
 
-    echo json_encode([
-        "message" => "User challenge added successfully",
-        "user_id" => $userId,
-        "challenge_id" => $challengeId,
-        "status" => $status,
-        "progress" => $progress,
-        "completed_at" => $completedAt
-    ]);
+    $insertStmt->close();
 }
 
-sqlsrv_close($conn);
+$checkStmt->close();
+$conn->close();
 ?>

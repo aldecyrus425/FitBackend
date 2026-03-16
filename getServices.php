@@ -1,20 +1,23 @@
 <?php
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure this uses mysqli_connect
 
 $query = "SELECT name FROM Services ORDER BY id";
 
-$stmt = sqlsrv_query($conn, $query);
+$stmt = $conn->prepare($query);
 
-if ($stmt === false) {
-    echo json_encode(["error" => "Failed to fetch services"]);
+if (!$stmt->execute()) {
+    echo json_encode(["error" => "Failed to fetch services", "details" => $stmt->error]);
+    $stmt->close();
+    $conn->close();
     exit();
 }
 
+$result = $stmt->get_result();
 $services = [];
 
-while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+while ($row = $result->fetch_assoc()) {
     $services[] = $row['name'];
 }
 
@@ -22,5 +25,6 @@ echo json_encode([
     "services" => $services
 ]);
 
-sqlsrv_close($conn);
+$stmt->close();
+$conn->close();
 ?>

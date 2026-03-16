@@ -1,7 +1,6 @@
 <?php
 header("Content-Type: application/json");
-
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure conn.php uses mysqli
 
 $input = json_decode(file_get_contents("php://input"), true);
 
@@ -12,25 +11,21 @@ if (!isset($input['user_id']) || empty($input['user_id'])) {
 
 $user_id = $input['user_id'];
 
-$query = "DELETE FROM Users WHERE id = ?";
-$params = [$user_id];
+// Delete from database using prepared statement
+$stmt = $conn->prepare("DELETE FROM Users WHERE id = ?");
+$stmt->bind_param("s", $user_id);
 
-$stmt = sqlsrv_query($conn, $query, $params);
-
-if ($stmt === false) {
-    echo json_encode(["error" => "Failed to delete user"]);
-    exit();
+if ($stmt->execute()) {
+    if ($stmt->affected_rows > 0) {
+        echo json_encode(["message" => "User deleted successfully"]);
+    } else {
+        echo json_encode(["error" => "User not found or cannot delete admin"]);
+    }
+} else {
+    http_response_code(500);
+    echo json_encode(["error" => "Failed to delete user", "details" => $stmt->error]);
 }
 
-$rowsAffected = sqlsrv_rows_affected($stmt);
-if ($rowsAffected === false || $rowsAffected === 0) {
-    echo json_encode(["error" => "User not found or cannot delete admin"]);
-    exit();
-}
-
-echo json_encode([
-    "message" => "User deleted successfully"
-]);
-
-sqlsrv_close($conn);
+$stmt->close();
+$conn->close();
 ?>

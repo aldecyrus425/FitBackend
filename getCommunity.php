@@ -1,20 +1,21 @@
 <?php
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure conn.php uses mysqli
 
-// Fetch all challenges
 $query = "SELECT * FROM CommunityChallenges ORDER BY created_at DESC";
-$stmt = sqlsrv_query($conn, $query);
 
-if ($stmt === false) {
+$result = $conn->query($query);
+
+if (!$result) {
     http_response_code(500);
-    echo json_encode(["error" => "Database query failed"]);
+    echo json_encode(["error" => "Database query failed", "details" => $conn->error]);
     exit();
 }
 
 $challenges = [];
-while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+
+while ($row = $result->fetch_assoc()) {
     $challenges[] = [
         "id" => $row["id"],
         "title" => $row["title"],
@@ -25,8 +26,8 @@ while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
     ];
 }
 
-// Return JSON response
 echo json_encode($challenges);
 
-sqlsrv_close($conn);
+$result->free();
+$conn->close();
 ?>

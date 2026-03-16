@@ -1,9 +1,9 @@
 <?php
-
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure conn.php uses mysqli
 
+// Get JSON input
 $data = json_decode(file_get_contents("php://input"), true);
 
 $name = trim($data['name'] ?? '');
@@ -24,36 +24,44 @@ if (!$name || !$duration) {
 
 $id = uniqid();
 
-$query = "INSERT INTO Exercises 
-(id, name, description, video_url, category, duration, sets, reps, difficulty)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+// Prepare SQL statement for MySQL
+$stmt = $conn->prepare("INSERT INTO Exercises 
+    (id, name, description, video_url, category, duration, sets, reps, difficulty)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-$params = [
-    $id,
-    $name,
-    $description,
-    $videoUrl,
-    $category,
-    $duration,
-    $sets,
-    $reps,
-    $difficulty
-];
-
-$stmt = sqlsrv_query($conn, $query, $params);
-
-if ($stmt === false) {
+if (!$stmt) {
     echo json_encode([
-        "error" => "Failed to add exercise"
+        "error" => "Failed to prepare statement: " . $conn->error
     ]);
     exit();
 }
 
-echo json_encode([
-    "message" => "Exercise added successfully",
-    "exercise_id" => $id
-]);
+// Bind parameters
+$stmt->bind_param(
+    "sssssiiss", 
+    $id, 
+    $name, 
+    $description, 
+    $videoUrl, 
+    $category, 
+    $duration, 
+    $sets, 
+    $reps, 
+    $difficulty
+);
 
-sqlsrv_close($conn);
+// Execute statement
+if ($stmt->execute()) {
+    echo json_encode([
+        "message" => "Exercise added successfully",
+        "exercise_id" => $id
+    ]);
+} else {
+    echo json_encode([
+        "error" => "Failed to add exercise: " . $stmt->error
+    ]);
+}
 
+$stmt->close();
+$conn->close();
 ?>

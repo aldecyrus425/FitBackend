@@ -1,7 +1,7 @@
 <?php
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure this uses mysqli_connect
 
 $userId = $_GET['user_id'] ?? '';
 
@@ -29,38 +29,40 @@ INNER JOIN CommunityChallenges c
 WHERE 
     uc.user_id = ?
     AND uc.status NOT IN ('completed','canceled')
-    AND DATEADD(day, c.duration_days, uc.started_at) >= GETDATE()
+    AND DATE_ADD(uc.started_at, INTERVAL c.duration_days DAY) >= NOW()
 ORDER BY uc.started_at DESC
 ";
 
-$params = [$userId];
+$stmt = $conn->prepare($query);
+$stmt->bind_param("s", $userId);
 
-$stmt = sqlsrv_query($conn, $query, $params);
-
-if ($stmt === false) {
+if (!$stmt->execute()) {
     http_response_code(500);
-    echo json_encode(["error" => "Database query failed"]);
+    echo json_encode(["error" => "Database query failed", "details" => $stmt->error]);
+    $stmt->close();
+    $conn->close();
     exit();
 }
 
+$result = $stmt->get_result();
 $challenges = [];
 
-while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-
+while ($row = $result->fetch_assoc()) {
     $challenges[] = [
         "challenge_id" => $row['challenge_id'],
         "title" => $row['title'],
         "description" => $row['description'],
         "category" => $row['category'],
         "level" => $row['level'],
-        "duration_days" => $row['duration_days'],
-        "progress" => $row['progress'],
-        "started_at" => $row['started_at']->format('Y-m-d'),
+        "duration_days" => (int)$row['duration_days'],
+        "progress" => (float)$row['progress'],
+        "started_at" => date('Y-m-d', strtotime($row['started_at'])),
         "status" => $row['status']
     ];
 }
 
 echo json_encode($challenges);
 
-sqlsrv_close($conn);
+$stmt->close();
+$conn->close();
 ?>

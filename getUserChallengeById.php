@@ -1,7 +1,7 @@
 <?php
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // should use mysqli_connect
 
 // Get parameters
 $user_id = $_GET['user_id'] ?? '';
@@ -22,19 +22,20 @@ $query = "
     WHERE uc.user_id = ? AND uc.challenge_id = ?
 ";
 
-// Prepare and execute statement
-$params = [$user_id, $challenge_id];
-$stmt = sqlsrv_query($conn, $query, $params);
+$stmt = $conn->prepare($query);
+$stmt->bind_param("ss", $user_id, $challenge_id);
 
-if ($stmt === false) {
-    $errors = sqlsrv_errors();
-    echo json_encode(["error" => "Execution failed", "details" => $errors]);
+if (!$stmt->execute()) {
+    echo json_encode(["error" => "Execution failed", "details" => $stmt->error]);
+    $stmt->close();
+    $conn->close();
     exit();
 }
 
-// Fetch result
+$result = $stmt->get_result();
 $challenges = [];
-while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+
+while ($row = $result->fetch_assoc()) {
     $challenges[] = [
         "challenge_id"   => $row['challenge_id'],
         "title"          => $row['title'],
@@ -43,14 +44,14 @@ while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
         "level"          => $row['level'],
         "duration_days"  => (int)$row['duration_days'],
         "progress"       => (float)$row['progress'],
-        "started_at"     => $row['started_at'] ? $row['started_at']->format('Y-m-d') : null,
-        "completed_at"   => $row['completed_at'] ? $row['completed_at']->format('Y-m-d') : null,
+        "started_at"     => $row['started_at'] ? date('Y-m-d', strtotime($row['started_at'])) : null,
+        "completed_at"   => $row['completed_at'] ? date('Y-m-d', strtotime($row['completed_at'])) : null,
         "status"         => $row['status']
     ];
 }
 
 echo json_encode($challenges);
 
-// Close connection
-sqlsrv_close($conn);
+$stmt->close();
+$conn->close();
 ?>

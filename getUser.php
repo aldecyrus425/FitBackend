@@ -1,20 +1,23 @@
 <?php
 header("Content-Type: application/json");
 
-include "./Connection/conn.php";
+include "./Connection/conn.php"; // Make sure this uses mysqli_connect
 
 $query = "SELECT * FROM Users WHERE is_admin = 0";
 
-$stmt = sqlsrv_query($conn, $query);
+$stmt = $conn->prepare($query);
 
-if ($stmt === false) {
-    echo json_encode(["error" => "Failed to fetch users"]);
+if (!$stmt->execute()) {
+    echo json_encode(["error" => "Failed to fetch users", "details" => $stmt->error]);
+    $stmt->close();
+    $conn->close();
     exit();
 }
 
+$result = $stmt->get_result();
 $users = [];
 
-while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+while ($row = $result->fetch_assoc()) {
     $users[] = [
         "id" => $row['id'],
         "name" => $row['name'],
@@ -28,5 +31,6 @@ echo json_encode([
     "users" => $users
 ]);
 
-sqlsrv_close($conn);
+$stmt->close();
+$conn->close();
 ?>

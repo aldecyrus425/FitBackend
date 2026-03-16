@@ -22,13 +22,14 @@ SELECT
     c.description,
     c.category,
     c.level,
-    c.duration_days
+    c.duration_days,
+    c.time_notify  -- include the notification time
 FROM UserCommunityChallenge uc
 INNER JOIN CommunityChallenges c 
     ON uc.challenge_id = c.id
 WHERE 
     uc.user_id = ?
-    AND uc.status NOT IN ('completed','canceled')
+    AND uc.status NOT IN ('completed','cancelled')
     AND DATE_ADD(uc.started_at, INTERVAL c.duration_days DAY) >= NOW()
 ORDER BY uc.started_at DESC
 ";
@@ -57,7 +58,8 @@ while ($row = $result->fetch_assoc()) {
         "duration_days" => (int)$row['duration_days'],
         "progress" => (float)$row['progress'],
         "started_at" => date('Y-m-d', strtotime($row['started_at'])),
-        "status" => $row['status']
+        "status" => $row['status'],
+        "time_notify" => $row['time_notify'] // send time_notify to client
     ];
 }
 

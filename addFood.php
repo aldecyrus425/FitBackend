@@ -56,9 +56,8 @@ if (!$stmt) {
     exit();
 }
 
-// Bind parameters
 $stmt->bind_param(
-    "sssddddssss",
+    "ssssddddsss",
     $foodId,
     $name,
     $description,
@@ -72,7 +71,6 @@ $stmt->bind_param(
     $level
 );
 
-// Execute
 if ($stmt->execute()) {
     echo json_encode([
         "message" => "Food added successfully",

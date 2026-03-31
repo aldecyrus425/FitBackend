@@ -59,7 +59,7 @@ while ($row = $result->fetch_assoc()) {
         "progress" => (float)$row['progress'],
         "started_at" => date('Y-m-d', strtotime($row['started_at'])),
         "status" => $row['status'],
-        "time_notify" => $row['time_notify'] // send time_notify to client
+        "time_notify" => $row['time_notify'] 
     ];
 }
 
